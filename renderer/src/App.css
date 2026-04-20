@@ -1,0 +1,652 @@
+/* =========================================
+   THEME (BLANCO + VERDE)
+========================================= */
+:root{
+  --bg: #f6f7f8;
+  --card: #ffffff;
+  --text: #0f172a;
+  --muted: rgba(15, 23, 42, 0.65);
+  --border: rgba(15, 23, 42, 0.10);
+
+  --green: #7ad8b0;
+  --green-2: #55c99a;
+  --green-soft: rgba(122, 216, 176, 0.22);
+
+  --danger: #ff4d4d;
+
+  --shadow: 0 10px 30px rgba(2, 6, 23, 0.08);
+
+  --sidebar: #0c5a55;
+  --sidebar-border: rgba(255,255,255,0.10);
+
+  --sidebarW: 260px;
+}
+
+*{ box-sizing: border-box; }
+
+body{
+  margin:0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+}
+
+/* =========================================
+   DASHBOARD LAYOUT
+========================================= */
+.appLayout{ min-height: 100vh; }
+
+.sidebar{
+  position: fixed;
+  left:0; top:0;
+  width: var(--sidebarW);
+  height: 100vh;
+  background: var(--sidebar);
+  color:#fff;
+  border-right: 1px solid var(--sidebar-border);
+  display:flex;
+  flex-direction: column;
+}
+
+.sidebarHeader{
+  padding: 18px 18px 12px;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+.sidebarBrand{ font-weight: 900; font-size: 18px; }
+.sidebarSub{ margin-top: 4px; font-size: 12px; opacity: 0.85; }
+
+.sideNav{ padding: 12px; display: grid; gap: 10px; }
+
+.sideItem{
+  width: 100%; display:flex; align-items:center; gap: 10px;
+  padding: 12px; border-radius: 12px;
+  border: 1px solid var(--sidebar-border);
+  background: rgba(255,255,255,0.06);
+  color:#fff; cursor:pointer; text-align:left; font-weight: 800;
+}
+.sideItem:hover{ background: rgba(255,255,255,0.10); }
+.sideItem.active{ background: rgba(122,216,176,0.20); border-color: rgba(122,216,176,0.55); }
+
+.dot{ width:10px; height:10px; border-radius: 999px; background: rgba(255,255,255,0.7); }
+.sideItem.active .dot{ background: var(--green); }
+
+.sidebarFooter{ margin-top:auto; padding: 12px 18px 18px; border-top: 1px solid var(--sidebar-border); }
+.hintSmall{ font-size: 12px; opacity: 0.75; }
+
+.main{ margin-left: var(--sidebarW); min-height: 100vh; }
+.mainContent{ width: 100%; padding: 22px 22px 30px; display: flex; justify-content: center; align-items: flex-start; }
+.container{ width: 100%; max-width: 980px; }
+
+/* =========================================
+   PAGES
+========================================= */
+.page{ width: 100%; }
+.page h2{ margin: 0 0 14px; font-size: 28px; font-weight: 900; }
+
+/* =========================================
+   GRIDS
+========================================= */
+.grid2{ display:grid; grid-template-columns: 1fr 1.25fr; gap: 14px; align-items: start; }
+.grid3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+@media (max-width: 1050px){ .container{ max-width: 900px; } }
+@media (max-width: 980px){ .grid2{ grid-template-columns: 1fr !important; } .grid3{ grid-template-columns: 1fr !important; } }
+
+/* =========================================
+   CARDS
+========================================= */
+.card{ background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; box-shadow: var(--shadow); }
+.rowBetween{ display:flex; align-items:center; justify-content: space-between; gap: 12px; }
+
+/* =========================================
+   FORM
+========================================= */
+.form{ display:grid; gap: 12px; margin-top: 10px; }
+.field{ display:grid; gap: 6px; }
+.field span{ font-size: 13px; color: var(--muted); font-weight: 800; }
+
+input, select{
+  width: 100%; min-height: 42px;
+  background: #fff; border: 1px solid var(--border);
+  color: var(--text); padding: 10px 12px;
+  border-radius: 12px; outline: none;
+}
+input:focus, select:focus{
+  border-color: rgba(85,201,154,0.9);
+  box-shadow: 0 0 0 4px rgba(122,216,176,0.25);
+}
+
+/* =========================================
+   STEPPER
+========================================= */
+.stepper{
+  display:grid;
+  grid-template-columns: 42px minmax(120px, 1fr) 42px;
+  gap: 8px; align-items:center;
+}
+.stepper input{ width: 100%; min-width: 120px; text-align: center; font-variant-numeric: tabular-nums; }
+
+.stepBtn{
+  height: 42px; border-radius: 12px; cursor:pointer;
+  background: rgba(122,216,176,0.18);
+  border: 1px solid rgba(85,201,154,0.35);
+  color: #0b3a2f; font-weight: 900; font-size: 16px;
+  position: relative; z-index: 5; pointer-events: auto;
+}
+.stepBtn:hover{ background: rgba(122,216,176,0.28); }
+
+/* =========================================
+   BUTTONS
+========================================= */
+.btn{
+  background: rgba(122,216,176,0.18);
+  border: 1px solid rgba(85,201,154,0.35);
+  color: #0b3a2f; padding: 10px 14px;
+  border-radius: 12px; cursor:pointer; font-weight: 900;
+}
+.btn:hover{ background: rgba(122,216,176,0.28); }
+.btn.primary{ background: var(--green-2); border-color: var(--green-2); color: #083126; width: 100%; }
+.btn.danger{ background-color: #e5484d; color: white; border: none; }
+.btn.danger:hover{ background-color: #c7373b; }
+.btn:disabled{ opacity: 0.6; cursor: not-allowed; }
+
+/* =========================================
+   MULTIPLICADORES DE PRECIO
+========================================= */
+.multRow{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.multBtn{
+  padding: 5px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(85,201,154,0.45);
+  background: rgba(122,216,176,0.14);
+  color: #0b3a2f;
+  font-weight: 900;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.multBtn:hover{
+  background: rgba(85,201,154,0.30);
+  border-color: var(--green-2);
+}
+
+/* =========================================
+   TABLES
+========================================= */
+.table{ margin-top: 10px; border-top: 1px solid var(--border); }
+.thead, .trow{ display:grid; grid-template-columns: 1fr 0.8fr 1fr; gap: 10px; padding: 10px 0; align-items: center; }
+.thead{ color: var(--muted); font-size: 13px; font-weight: 900; }
+.trow{ border-top: 1px solid var(--border); }
+.table.compact .thead, .table.compact .trow{ padding: 8px 0; }
+.thead2, .trow2{ grid-template-columns: 1.2fr 0.8fr; }
+
+.actions{ display:flex; justify-content: center; align-items: center; gap: 12px; width: 100%; min-width: 120px; }
+.table .thead > div:last-child, .table .trow > div:last-child{ text-align: center; }
+
+.moneyCell{ white-space: nowrap; }
+.activeRow{ background: rgba(122,216,176,0.16); border-radius: 12px; padding-left: 10px !important; padding-right: 10px !important; }
+.empty{ padding: 12px 0; color: var(--muted); }
+.hint{ margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.4; white-space: normal; }
+
+/* =========================================
+   STOCK BADGE
+========================================= */
+.stock{ font-weight: 900; }
+.stock.zero{ color: #d21f1f; }
+.stockCell{ display:flex; justify-content:center; align-items:center; }
+.stockBadge{
+  min-width: 38px; height: 34px; padding: 0 10px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius: 999px; font-weight: 900; font-size: 14px;
+  background: rgba(122,216,176,0.20); border: 1px solid rgba(85,201,154,0.40); color: #0b7a55;
+}
+.stockLow{ background: rgba(255,183,77,0.18); border: 1px solid rgba(255,183,77,0.45); color: #8a4b00; }
+.stockZero{ background: rgba(255,77,77,0.15); border: 1px solid rgba(255,77,77,0.45); color: #7a0d0d; }
+
+/* =========================================
+   DETALLE
+========================================= */
+.detailGrid{ display:grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+@media (max-width: 980px){ .detailGrid{ grid-template-columns: 1fr; } }
+.detailItem{ background: rgba(122,216,176,0.10); border: 1px solid rgba(85,201,154,0.22); border-radius: 14px; padding: 12px; }
+.detailLabel{ font-size: 12px; color: var(--muted); font-weight: 900; margin-bottom: 4px; }
+.detailValue{ font-weight: 900; }
+
+/* =========================================
+   EVOLUCIÓN
+========================================= */
+.evoCard{ background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 14px; box-shadow: var(--shadow); }
+.evoHeader{ display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.evoTitle{ font-weight: 900; font-size: 16px; }
+.evoAddBtn{ white-space: nowrap; padding: 10px 14px; }
+.evoThead, .evoRow{ display:grid; grid-template-columns: 0.8fr 0.55fr 0.55fr 1.2fr 0.65fr; gap: 10px; align-items:center; }
+.evoThead{ margin-top: 10px; margin-bottom: 8px; }
+.evoTh{ background: rgba(122,216,176,0.18); padding: 10px 12px; border-radius: 12px; font-weight: 900; color: #0b3a2f; border: 1px solid rgba(85,201,154,0.25); }
+.evoRow{ padding: 8px 2px; border-top: 1px solid var(--border); }
+.evoDate{ font-weight: 900; }
+.evoVal{ text-align:center; color: var(--text); font-weight: 900; }
+.evoVal.muted{ color: var(--muted); }
+.evoVal.hi{ color: #0b7a55; }
+.evoEmpty{ padding: 10px 2px; color: var(--muted); }
+.evoActions{ display: flex; justify-content: center; align-items: center; gap: 10px; }
+.evoTrashBtn{ width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--border); background: rgba(15,23,42,0.04); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.15s ease; }
+.evoTrashBtn img{ width: 18px; height: 18px; opacity: 0.75; }
+.evoTrashBtn:hover{ background: rgba(255,77,77,0.15); border-color: rgba(255,77,77,0.35); }
+.evoTrashBtn:hover img{ opacity: 1; }
+
+/* =========================================
+   ICON BUTTON
+========================================= */
+.iconBtn{ width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--border); background: rgba(15,23,42,0.04); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.15s ease; }
+.iconBtn img{ width: 18px; height: 18px; opacity: 0.75; }
+.iconBtn:hover{ background: rgba(15,23,42,0.08); }
+.dangerIcon:hover{ background: rgba(255,77,77,0.15); border-color: rgba(255,77,77,0.35); }
+.dangerIcon:hover img{ opacity: 1; }
+
+/* =========================================
+   ERRORES INLINE
+========================================= */
+.fieldErrorSlot{ min-height: 16px; margin-top: 6px; font-size: 12px; font-weight: 900; color: var(--danger); line-height: 1.2; }
+.inputError{ border-color: var(--danger) !important; }
+
+/* =========================================
+   TOAST
+========================================= */
+.toast{ position: fixed; right: 18px; bottom: 18px; background: rgba(255,255,255,0.92); border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 12px; z-index: 999999; pointer-events:none; backdrop-filter: blur(8px); font-size: 13px; max-width: 420px; box-shadow: var(--shadow); }
+
+/* =========================================
+   MODAL
+========================================= */
+.modalOverlay{ position: fixed; inset: 0; background: rgba(2,6,23,0.20); display: flex; align-items: center; justify-content: center; z-index: 999999; padding: 18px; backdrop-filter: blur(6px); }
+.modalCard{ width: 100%; max-width: 520px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; box-shadow: var(--shadow); }
+.modalLarge{ max-width: 680px; max-height: 90vh; overflow-y: auto; }
+.modalHeader{ display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.modalTitle{ font-weight: 900; font-size: 16px; color: var(--text); }
+.modalClose{ width: 38px; height: 38px; border-radius: 12px; border: 1px solid var(--border); background: rgba(122,216,176,0.12); color: #0b3a2f; cursor: pointer; font-weight: 900; }
+.modalClose:hover{ background: rgba(122,216,176,0.22); }
+.modalActions{ display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px; }
+
+.modalCard .stepper{ grid-template-columns: 42px minmax(120px, 1fr) 42px; }
+.modalCard .stepBtn{ height: 42px; border-radius: 12px; background: rgba(122,216,176,0.18); border: 1px solid rgba(85,201,154,0.35); color: #0b3a2f; font-weight: 900; font-size: 16px; }
+.modalCard .stepBtn:hover{ background: rgba(122,216,176,0.28); }
+.modalCard .stepper input{ min-width: 120px; text-align: center; font-variant-numeric: tabular-nums; }
+
+/* =========================================
+   COMBO DROPDOWN
+========================================= */
+.comboDropdown{ position: absolute; top: calc(100% - 6px); left: 0; right: 0; background: #fff; border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); z-index: 9999; overflow: hidden; max-height: 280px; overflow-y: auto; }
+.comboItem{ width: 100%; text-align: left; padding: 10px 12px; border: none; background: transparent; cursor: pointer; border-top: 1px solid rgba(15,23,42,0.06); }
+.comboItem:first-child{ border-top: none; }
+.comboItem:hover{ background: rgba(122,216,176,0.18); }
+.comboEmpty{ padding: 12px; color: var(--muted); font-weight: 800; }
+
+/* =========================================
+   FRAMES ACTIONS
+========================================= */
+.framesActions{ gap: 10px; flex-wrap: nowrap; }
+.framesActions .btn{ padding: 10px 14px; white-space: nowrap; }
+.framesActions .iconBtn{ width: 42px; height: 42px; border-radius: 12px; }
+.inventoryBar{ display:flex; gap: 10px; align-items:center; flex-wrap: wrap; }
+.actions .stepBtn{ width: 42px; padding: 0; display:flex; justify-content:center; align-items:center; }
+
+/* =========================================
+   TALLES (checkboxes) – originales
+========================================= */
+.sizeGrid{ display: flex; flex-wrap: wrap; gap: 10px; }
+.sizePill{ display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--border); background: rgba(122,216,176,0.10); min-width: 66px; height: 44px; }
+.sizePill label{ display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; font-weight: 900; }
+.sizePill input[type="checkbox"]{ width: 16px; height: 16px; min-height: 16px; margin: 0; accent-color: #8e44ad; }
+.sizePill .sizeTxt{ font-weight: 900; font-size: 14px; }
+.sizeGrid.compact{ gap: 8px; }
+.sizeGrid.compact .sizePill{ padding: 5px 7px; min-width: 58px; height: auto; border-radius: 10px; flex-wrap: wrap; gap: 4px; }
+.sizeGrid.compact .sizeTxt{ font-size: 13px; }
+.sizeGrid.compact input[type="checkbox"]{ width: 15px; height: 15px; min-height: 15px; }
+
+/* Cantidad por talle en inventario (badge pequeño) */
+.talleBadgeQty{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(85,201,154,0.25);
+  border: 1px solid rgba(85,201,154,0.45);
+  font-size: 11px;
+  font-weight: 900;
+  color: #0b5a3a;
+}
+
+/* =========================================
+   TALLE + STOCK (nuevo: pill con stepper)
+========================================= */
+.talleStockGrid{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.talleStockPill{
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(15,23,42,0.03);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.talleStockPill.active{
+  background: rgba(122,216,176,0.12);
+  border-color: rgba(85,201,154,0.45);
+}
+
+.talleCheckLabel{
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  user-select: none;
+  font-weight: 900;
+  font-size: 14px;
+}
+
+.talleCheckLabel input[type="checkbox"]{
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin: 0;
+  accent-color: #8e44ad;
+}
+
+.talleQtyStepper{
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.talleQtyStepper .stepBtn{
+  width: 28px;
+  height: 28px;
+  min-height: unset;
+  border-radius: 8px;
+  font-size: 15px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.talleQtyStepper input{
+  width: 44px;
+  min-height: 28px;
+  height: 28px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 14px;
+  padding: 4px;
+}
+
+/* =========================================
+   CHIPS (colores)
+========================================= */
+.chipInputBox{
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  cursor: text;
+}
+
+.chipInputBox:focus-within{
+  border-color: rgba(85,201,154,0.9);
+  box-shadow: 0 0 0 4px rgba(122,216,176,0.25);
+}
+
+.chip{
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(122,216,176,0.22);
+  border: 1px solid rgba(85,201,154,0.40);
+  font-size: 13px;
+  font-weight: 800;
+  color: #0b3a2f;
+  white-space: nowrap;
+}
+
+.chipSmall{
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.chipRemove{
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  color: #0b3a2f;
+  padding: 0;
+  opacity: 0.6;
+  display: flex;
+  align-items: center;
+  min-height: unset;
+  width: auto;
+}
+.chipRemove:hover{ opacity: 1; }
+
+.chipInput{
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  min-height: unset !important;
+  height: 28px;
+  flex: 1;
+  min-width: 140px;
+  padding: 0 4px;
+  font-size: 13px;
+  background: transparent;
+}
+
+/* ── Talle pill clickable ─────────────────────────────────────── */
+.sizePill.clickable{
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s, border-color 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.sizePill.clickable:hover{
+  background: rgba(122,216,176,0.28);
+  border-color: rgba(85,201,154,0.6);
+}
+.sizePill.pillActive{
+  background: rgba(122,216,176,0.20);
+  border-color: rgba(85,201,154,0.50);
+}
+
+/* ── Stock inicial badge ─────────────────────────────────────── */
+.stockInicial{
+  background: rgba(148,163,184,0.18);
+  border: 1px solid rgba(148,163,184,0.40);
+  color: #475569;
+}
+
+/* ── Modal selección curva ───────────────────────────────────── */
+.curvaOpcion {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(122, 216, 176, 0.08);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.curvaOpcion:hover {
+  background: rgba(122, 216, 176, 0.22);
+  border-color: rgba(85, 201, 154, 0.5);
+}
+.curvaOpcionTitle {
+  font-weight: 900;
+  font-size: 15px;
+  color: var(--text);
+}
+.curvaOpcionSub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+  font-weight: 700;
+}
+
+/* =========================================
+   SIDEBAR SECCIONES
+========================================= */
+.sideSectionLabel{
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.45);
+  padding: 0 4px;
+}
+.sideDivider{
+  border: none;
+  border-top: 1px solid var(--sidebar-border);
+  margin: 4px 0;
+}
+
+/* =========================================
+   VENTAS – BUSCADOR PRODUCTO
+========================================= */
+.prodSeleccionado{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 1px solid rgba(85,201,154,0.5);
+  border-radius: 12px;
+  background: rgba(122,216,176,0.10);
+}
+.prodSeleccionadoInfo{ flex: 1; }
+
+/* =========================================
+   VENTAS – SELECTOR DE TALLES
+========================================= */
+.tallesVentaGrid{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.talleVentaBtn{
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(15,23,42,0.03);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  min-width: 50px;
+}
+.talleVentaBtn:hover{
+  background: rgba(122,216,176,0.18);
+  border-color: rgba(85,201,154,0.5);
+}
+.talleVentaBtn.active{
+  background: rgba(122,216,176,0.25);
+  border-color: rgba(85,201,154,0.7);
+}
+.talleVentaBtn.sinStock{
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.talleVentaBtn.sinStock:hover{
+  background: rgba(15,23,42,0.03);
+  border-color: var(--border);
+}
+.talleVentaQty{
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--muted);
+}
+.talleVentaBtn.active .talleVentaQty{
+  color: #0b5a3a;
+}
+
+/* =========================================
+   VENTAS – STATS
+========================================= */
+.ventasStats{
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.ventasStat{
+  flex: 1;
+  min-width: 120px;
+  background: rgba(122,216,176,0.12);
+  border: 1px solid rgba(85,201,154,0.30);
+  border-radius: 14px;
+  padding: 12px 16px;
+}
+.ventasStatLabel{
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+.ventasStatValue{
+  font-size: 22px;
+  font-weight: 900;
+  color: #0b5a3a;
+}
+
+/* =========================================
+   VENTAS – FILTROS
+========================================= */
+.ventasFiltros{
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.ventasFiltroFecha{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--muted);
+}
+.ventasFiltroFecha input{
+  width: 160px;
+  min-height: 38px;
+}

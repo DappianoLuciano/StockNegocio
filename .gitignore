@@ -1,0 +1,9 @@
+node_modules
+renderer/node_modules
+renderer/dist
+dist-installer
+.env
+/generated/prisma
+*.db
+*.sqlite
+*.sqlite3
