@@ -1,6 +1,6 @@
 {
   "name": "stocknegocio",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Stock de negocio KAIA",
   "author": "KAIA",
   "main": "main/main.js",
