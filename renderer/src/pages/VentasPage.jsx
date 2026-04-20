@@ -5,19 +5,20 @@ const TALLESETS = {
   numericos: ["40","42","44","46","48","50","52"],
   none:      [],
 };
-const TIPO_TO_CURVA = {
-  REMERA:"letras",SWEATER:"letras",CAMISA:"letras",ABRIGO:"letras",
-  CAMPERA:"letras",VESTIDO:"letras",MONOPRENDA:"letras",POLERA:"letras",
-  CHALECO:"letras",CONJUNTO:"letras",TRAJE:"letras",
-  "PANTALON SASTRERO":"numericos",JEANS:"numericos",JOGGING:"numericos",
-  PALAZO:"numericos",FALDA:"numericos",SHORT:"numericos",
-  BERMUDAS:"numericos",MALLA:"numericos",
-  CHALINA:"none",CINTURÓN:"none",BIJOU:"none",
+const TIPO_TO_CURVA_DEFAULT = {
+  Remera:"letras",Sweater:"letras",Camisa:"letras",Abrigo:"letras",
+  Campera:"letras",Vestido:"letras",Monoprenda:"letras",Polera:"letras",
+  Chaleco:"letras",Conjunto:"letras",Traje:"letras",
+  "Pantalon Sastrero":"numericos",Jeans:"numericos",Jogging:"numericos",
+  Palazo:"numericos",Falda:"numericos",Short:"numericos",
+  Bermudas:"numericos",Malla:"numericos",
+  Chalina:"none",Cinturón:"none",Bijou:"none",
 };
 
-function getTalles(producto) {
+function getTalles(producto, tiposDB) {
   if (!producto) return [];
-  const curva = TIPO_TO_CURVA[producto.tipo] || "none";
+  const found = tiposDB?.find((t) => t.nombre === producto.tipo);
+  const curva = found?.curva ?? TIPO_TO_CURVA_DEFAULT[producto.tipo] ?? "none";
   return TALLESETS[curva] || [];
 }
 
@@ -97,6 +98,7 @@ function ProductoComboField({ value, query, open, resultados, onFocus, onChange,
 // ── Componente principal ──────────────────────────────────────────
 export default function VentasPage({ season }) {
   const [productos, setProductos] = useState([]);
+  const [tiposDB, setTiposDB]     = useState([]);
   const [ventas, setVentas]       = useState([]);
   const [loading, setLoading]     = useState(false);
 
@@ -136,6 +138,13 @@ export default function VentasPage({ season }) {
     } catch { /* silencioso */ }
   }
 
+  async function loadTipos() {
+    try {
+      const data = await window.api.listTipos();
+      setTiposDB(Array.isArray(data) ? data : []);
+    } catch { /* silencioso */ }
+  }
+
   async function loadVentas() {
     try {
       setLoading(true);
@@ -145,7 +154,7 @@ export default function VentasPage({ season }) {
     finally { setLoading(false); }
   }
 
-  useEffect(() => { loadProductos(); loadVentas(); }, []);
+  useEffect(() => { loadProductos(); loadTipos(); loadVentas(); }, []);
 
   // Resultado del combo producto
   const resultadosProd = useMemo(() => {
@@ -159,7 +168,7 @@ export default function VentasPage({ season }) {
   }, [prodQuery, productos]);
 
   // Talles disponibles del producto seleccionado
-  const tallesDisponibles = useMemo(() => getTalles(selectedProd), [selectedProd]);
+  const tallesDisponibles = useMemo(() => getTalles(selectedProd, tiposDB), [selectedProd, tiposDB]);
 
   // Stock disponible para talle seleccionado
   const stockDisponible = useMemo(() => {
