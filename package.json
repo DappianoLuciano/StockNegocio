@@ -50,8 +50,8 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "lucdappiano",
-      "repo": "kaia-stock"
+      "owner": "DappianoLuciano",
+      "repo": "StockNegocio"
     }
   }
 }
