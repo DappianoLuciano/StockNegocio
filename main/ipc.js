@@ -99,7 +99,7 @@ function registerIpcHandlers(dir) {
   });
 
   ipcMain.handle("tipos:create", async (_e, payload) => {
-    const nombre = String(payload?.nombre ?? "").trim().toUpperCase();
+    const nombre = String(payload?.nombre ?? "").trim();
     const curva  = ["letras","numericos","none"].includes(payload?.curva) ? payload.curva : "none";
     if (!nombre) throw new Error("Nombre de tipo obligatorio");
     try {

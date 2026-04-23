@@ -8,10 +8,10 @@ const DEFAULT_BRANDS = [
 ];
 
 const TIPOS = [
-  "REMERA","PANTALON SASTRERO","JEANS","POLERA","JOGGING","SWEATER",
-  "CAMISA","ABRIGO","CAMPERA","CHALINA","CINTURÓN","BIJOU","PALAZO",
-  "VESTIDO","MONOPRENDA","FALDA","SHORT","BERMUDAS","MALLA","CHALECO",
-  "CONJUNTO","TRAJE",
+  "Remera","Pantalon Sastrero","Jeans","Polera","Jogging","Sweater",
+  "Camisa","Abrigo","Campera","Chalina","Cinturón","Bijou","Palazo",
+  "Vestido","Monoprenda","Falda","Short","Bermudas","Malla","Chaleco",
+  "Conjunto","Traje",
 ];
 
 const TALLESETS = {
@@ -21,13 +21,13 @@ const TALLESETS = {
 };
 
 const TIPO_TO_CURVA = {
-  REMERA:"letras",SWEATER:"letras",CAMISA:"letras",ABRIGO:"letras",
-  CAMPERA:"letras",VESTIDO:"letras",MONOPRENDA:"letras",POLERA:"letras",
-  CHALECO:"letras",CONJUNTO:"letras",TRAJE:"letras",
-  "PANTALON SASTRERO":"numericos",JEANS:"numericos",JOGGING:"numericos",
-  PALAZO:"numericos",FALDA:"numericos",SHORT:"numericos",
-  BERMUDAS:"numericos",MALLA:"numericos",
-  CHALINA:"none",CINTURÓN:"none",BIJOU:"none",
+  Remera:"letras",Sweater:"letras",Camisa:"letras",Abrigo:"letras",
+  Campera:"letras",Vestido:"letras",Monoprenda:"letras",Polera:"letras",
+  Chaleco:"letras",Conjunto:"letras",Traje:"letras",
+  "Pantalon Sastrero":"numericos",Jeans:"numericos",Jogging:"numericos",
+  Palazo:"numericos",Falda:"numericos",Short:"numericos",
+  Bermudas:"numericos",Malla:"numericos",
+  Chalina:"none",Cinturón:"none",Bijou:"none",
 };
 
 const MULTIPLICADORES = [2.1, 2.2, 2.3, 2.4, 2.5];
