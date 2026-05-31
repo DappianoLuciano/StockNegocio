@@ -1,0 +1,69 @@
+/* Grid de previsualizaciones */
+.labels-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  padding: 0 20px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* Tarjeta de preview individual */
+.label-preview {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.label-preview:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+/* Header con info del barcode */
+.label-header {
+  margin-bottom: 12px;
+}
+
+.label-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label-code {
+  font-size: 13px;
+  font-weight: 900;
+  color: #1e293b;
+  font-family: monospace;
+}
+
+.label-detail {
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+/* Canvas del código de barras */
+.label-canvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #f1f5f9;
+  min-height: 120px;
+}
+
+.label-canvas canvas {
+  max-width: 100%;
+  max-height: 100px;
+  object-fit: contain;
+}
+
+/* Estilos de impresión - NO usar @media print aquí,
+   se manejan inline en la ventana de impresión */

@@ -1,6 +1,6 @@
 {
   "name": "stocknegocio",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "Stock de negocio KAIA",
   "author": "KAIA",
   "main": "main/main.js",
@@ -14,7 +14,7 @@
   },
   "devDependencies": {
     "concurrently": "^9.0.0",
-    "electron": "^33.0.0",
+    "electron": "^31.7.6",
     "electron-builder": "^25.0.0",
     "wait-on": "^8.0.0"
   },

@@ -2,21 +2,21 @@ const { app, BrowserWindow, dialog } = require("electron");
 const path = require("path");
 const fs   = require("fs");
 
-// Capturar errores no manejados
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught exception:", err);
-  if (app?.isReady?.()) {
-    dialog.showErrorBox("Error inesperado", err?.message || String(err));
-    app.quit();
-  } else {
-    process.exit(1);
-  }
-});
+// Capturar errores no manejados (temporalmente deshabilitado para debug)
+// process.on("uncaughtException", (err) => {
+//   console.error("Error inesperado:", err);
+//   if (app && app.isReady()) {
+//     dialog.showErrorBox("Error inesperado", err?.message || String(err));
+//     app.quit();
+//   } else {
+//     process.exit(1);
+//   }
+// });
 
 async function resolveDbPath() {
   const userDir     = app.getPath("userData");
   const pointerFile = path.join(userDir, "db-path.json");
-  fs.mkdirSync(userDir, { recursive: true });
+  fs.mkdirSync(userDir, { recursive: true);
 
   if (fs.existsSync(pointerFile)) {
     try {
@@ -47,7 +47,7 @@ async function resolveDbPath() {
       throw new Error("No se seleccionó ninguna base de datos.");
     dbPath = result.filePaths[0];
   } else {
-    dbPath = path.join(userDir, "stock.db");
+    dbPath = path.join(userDir, "invierno26.db");
   }
 
   fs.writeFileSync(pointerFile, JSON.stringify({ dbPath }), "utf8");
@@ -73,7 +73,6 @@ async function createWindow() {
     width:  1280,
     height: 860,
     show:   false, // no mostrar hasta que cargue
-    icon:   path.join(__dirname, "..", "build", "icon.png"),
     webPreferences: {
       preload:          path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -91,7 +90,7 @@ async function createWindow() {
 
   if (!app.isPackaged) {
     win.loadURL("http://localhost:5173");
-    // win.webContents.openDevTools({ mode: "detach" }); // Deshabilitado
+    win.webContents.openDevTools({ mode: "detach" });
   } else {
     const indexPath = path.join(__dirname, "..", "renderer", "dist", "index.html");
     if (!fs.existsSync(indexPath)) {
@@ -112,13 +111,7 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   try { require("./db").closeDb(); } catch (_) {}
-  if (process.platform !== "darwin") {
-    app.quit();
-    // Forzar salida del proceso en dev
-    if (!app.isPackaged) {
-      setTimeout(() => process.exit(0), 100);
-    }
-  }
+  if (process.platform !== "darwin") app.quit();
 });
 
 function setupAutoUpdater() {
