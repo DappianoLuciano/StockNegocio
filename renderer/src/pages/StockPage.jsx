@@ -211,6 +211,7 @@ export default function StockPage({ modo = "inventario", temporada = "invierno26
   const [editTalles, setEditTalles] = useState([]);
   const [editColores, setEditColores] = useState([]);
   const [editColorInput, setEditColorInput] = useState("");
+  const [editCurva, setEditCurva] = useState("letras"); // Nueva: curva seleccionada manualmente
 
   // Modal de códigos de barras
   const [barcodeModalOpen, setBarcodeModalOpen] = useState(false);
@@ -532,6 +533,7 @@ export default function StockPage({ modo = "inventario", temporada = "invierno26
         precioFinal: precioFinal.trim(),
         talles: talles.join(","),
         colores: colores.join(","),
+        temporada,
       });
 
       setProductoCreado(productoNuevo);
@@ -715,6 +717,10 @@ export default function StockPage({ modo = "inventario", temporada = "invierno26
         cantidad: barcodeCantidad,
       });
 
+      if (!result || !result.barcode) {
+        throw new Error("No se pudo generar el código de barras");
+      }
+
       setCodigoGenerado(result.barcode);
 
       // Resetear campos
@@ -729,6 +735,7 @@ export default function StockPage({ modo = "inventario", temporada = "invierno26
       setLastMode("generar");
       setBarcodeModalMode("success");
     } catch (err) {
+      console.error("Error generando código:", err);
       showToast(err?.message || "Error generando código");
     }
   }
@@ -768,6 +775,10 @@ export default function StockPage({ modo = "inventario", temporada = "invierno26
     setEditTalles(parseTallesCSV(row.talles));
     setEditColores(parseColores(row.colores));
     setEditColorInput("");
+
+    // Detectar curva actual del tipo
+    const tipoObj = allTipos.find((t) => t.nombre === row.tipo);
+    setEditCurva(tipoObj?.curva || TIPO_TO_CURVA[row.tipo] || "letras");
 
     setEditMarcaShowAdd(false);
     setEditMarcaNewName("");
@@ -2198,13 +2209,45 @@ export default function StockPage({ modo = "inventario", temporada = "invierno26
                 ))}
               </div>
 
+              {/* Selector de curva de talles */}
+              <div className="field">
+                <span style={{ fontSize: 13, color: "rgba(15,23,42,0.65)", fontWeight: 800 }}>Curva de talles</span>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, marginBottom: 8 }}>
+                  Seleccioná el tipo de talles que usa este producto
+                </div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className={`tallePill ${editCurva === "letras" ? "tallePillActive" : ""}`}
+                    onClick={() => setEditCurva("letras")}
+                  >
+                    Letras (S, M, L, XL, XXL)
+                  </button>
+                  <button
+                    type="button"
+                    className={`tallePill ${editCurva === "numericos" ? "tallePillActive" : ""}`}
+                    onClick={() => setEditCurva("numericos")}
+                  >
+                    Numéricos (40, 42, 44...)
+                  </button>
+                  <button
+                    type="button"
+                    className={`tallePill ${editCurva === "none" ? "tallePillActive" : ""}`}
+                    onClick={() => setEditCurva("none")}
+                  >
+                    Sin talles
+                  </button>
+                </div>
+                <div className="fieldErrorSlot">{" "}</div>
+              </div>
+
               <div className="field">
                 <span style={{ fontSize: 13, color: "rgba(15,23,42,0.65)", fontWeight: 800 }}>Talles disponibles</span>
                 <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4, marginBottom: 8 }}>
-                  Nota: Los talles ya asignados a códigos no se pueden eliminar aquí
+                  Seleccioná los talles específicos que este producto tiene
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {["ÚNICO", ...getCurvaForTipo(editTipo)].map((t) => {
+                  {["ÚNICO", ...(TALLESETS[editCurva] || [])].map((t) => {
                     const active = editTalles.includes(t);
                     return (
                       <button

@@ -85,8 +85,24 @@ function getIdFromPayload(p) {
 
 let dbDir = null;
 
-function registerIpcHandlers(dir) {
+function registerIpcHandlers(dir, sync) {
   dbDir = dir;
+
+  // ── SINCRONIZACIÓN CON LA WEB ──────────────────────────────────
+  ipcMain.handle("sync:getStatus", async () => sync?.getStatus() ?? null);
+  ipcMain.handle("sync:now", async () => {
+    await sync?.syncNow();
+    return sync?.getStatus() ?? null;
+  });
+  ipcMain.handle("sync:resync", async () => {
+    await sync?.resync();
+    return sync?.getStatus() ?? null;
+  });
+  ipcMain.handle("sync:link", async (_e, { email, password }) => {
+    if (!email || !password) throw new Error("Ingresá el email y la contraseña del panel de la web");
+    await sync?.link({ email: String(email).trim(), password: String(password) });
+    return sync?.getStatus() ?? null;
+  });
 
   // ── TEMPORADAS ─────────────────────────────────────────────────
   // Ya no se cambia de DB, solo se usa una única base de datos
@@ -644,7 +660,7 @@ function registerIpcHandlers(dir) {
     });
   });
 
-  // Eliminar lote cerrado y devolver stock
+  // Eliminar lote (abierto o cerrado)
   ipcMain.handle("lote:delete", async (_e, { id }) => {
     const loteId = Number(id);
     if (!loteId) throw new Error("Lote ID obligatorio");
@@ -653,32 +669,35 @@ function registerIpcHandlers(dir) {
 
     const lote = get("SELECT * FROM Lote WHERE id = ?", [loteId]);
     if (!lote) throw new Error("Lote no encontrado");
-
-    // Verificar que el lote esté cerrado
-    if (lote.estado !== 'cerrado') {
-      throw new Error("Solo se pueden eliminar lotes cerrados");
+    if (lote.origen === "web") {
+      throw new Error("Esta venta se hizo en la web. Para anularla, cancelá el pedido desde el panel de la web.");
     }
 
     // Obtener todas las ventas del lote
     const ventas = all("SELECT * FROM Venta WHERE loteId = ?", [loteId]);
     console.log("🗑️ [LOTE:DELETE] Ventas a revertir:", ventas.length);
 
-    // Devolver stock de cada venta
-    for (const venta of ventas) {
-      if (venta.barcodeId) {
-        const barcode = get("SELECT * FROM ProductoBarcode WHERE id = ?", [venta.barcodeId]);
-        if (barcode) {
-          console.log(`🗑️ [LOTE:DELETE] Barcode ${venta.barcodeId}: stock antes=${barcode.cantidad}, devolver=${venta.cantidad}`);
-          const nuevaCantidad = barcode.cantidad + venta.cantidad;
-          run(
-            `UPDATE ProductoBarcode SET cantidad = ?, updatedAt = datetime('now') WHERE id = ?`,
-            [nuevaCantidad, venta.barcodeId]
-          );
-          console.log(`🗑️ [LOTE:DELETE] Barcode ${venta.barcodeId}: stock después=${nuevaCantidad}`);
-        } else {
-          console.warn(`🗑️ [LOTE:DELETE] Barcode ${venta.barcodeId} no encontrado, no se puede devolver stock`);
+    // Solo devolver stock si el lote está cerrado
+    // Si está abierto, no se descontó el stock todavía
+    if (lote.estado === 'cerrado') {
+      for (const venta of ventas) {
+        if (venta.barcodeId) {
+          const barcode = get("SELECT * FROM ProductoBarcode WHERE id = ?", [venta.barcodeId]);
+          if (barcode) {
+            console.log(`🗑️ [LOTE:DELETE] Barcode ${venta.barcodeId}: stock antes=${barcode.cantidad}, devolver=${venta.cantidad}`);
+            const nuevaCantidad = barcode.cantidad + venta.cantidad;
+            run(
+              `UPDATE ProductoBarcode SET cantidad = ?, updatedAt = datetime('now') WHERE id = ?`,
+              [nuevaCantidad, venta.barcodeId]
+            );
+            console.log(`🗑️ [LOTE:DELETE] Barcode ${venta.barcodeId}: stock después=${nuevaCantidad}`);
+          } else {
+            console.warn(`🗑️ [LOTE:DELETE] Barcode ${venta.barcodeId} no encontrado, no se puede devolver stock`);
+          }
         }
       }
+    } else {
+      console.log("🗑️ [LOTE:DELETE] Lote abierto - no se devuelve stock (nunca se descontó)");
     }
 
     // Eliminar ventas del lote
@@ -786,6 +805,7 @@ function registerIpcHandlers(dir) {
     const precioFinal = normalizeFloat(payload?.precioFinal);
     const talles      = normalizeTalles(payload?.talles);
     const colores     = normalizeColores(payload?.colores);
+    const temporada   = /^[a-z0-9]+$/.test(String(payload?.temporada ?? "")) ? String(payload.temporada) : null;
 
     if (!marca) throw new Error("Marca obligatoria");
     if (!tipo)  throw new Error("Tipo de prenda obligatorio");
@@ -812,8 +832,8 @@ function registerIpcHandlers(dir) {
       const coloresEsc = colores.replace(/'/g, "''");
 
       db.exec(`
-        INSERT INTO Producto (marca, tipo, codigo, costo, precioFinal, talles, colores, stock, stockInicial, talleStock, createdAt, updatedAt)
-        VALUES ('${marcaEsc}', '${tipoEsc}', ${codigoEsc ? `'${codigoEsc}'` : 'NULL'}, ${costo || 'NULL'}, ${precioFinal || 'NULL'}, '${tallesEsc}', '${coloresEsc}', 0, 0, '{}', datetime('now'), datetime('now'))
+        INSERT INTO Producto (marca, tipo, codigo, costo, precioFinal, talles, colores, temporada, stock, stockInicial, talleStock, createdAt, updatedAt)
+        VALUES ('${marcaEsc}', '${tipoEsc}', ${codigoEsc ? `'${codigoEsc}'` : 'NULL'}, ${costo || 'NULL'}, ${precioFinal || 'NULL'}, '${tallesEsc}', '${coloresEsc}', ${temporada ? `'${temporada}'` : 'NULL'}, 0, 0, '{}', datetime('now'), datetime('now'))
       `);
 
       // Persistir
@@ -1047,7 +1067,22 @@ function registerIpcHandlers(dir) {
         [productoId, barcode, talle, color, cantidad]
       );
       console.log(`📦 [BARCODE] Creado: ${barcode} (${talle || 'sin talle'}/${color || 'sin color'}) → cantidad: ${cantidad}`);
-      return get("SELECT * FROM ProductoBarcode WHERE id = ?", [r.lastInsertRowid]);
+      console.log(`📦 [BARCODE] lastInsertRowid:`, r.lastInsertRowid);
+
+      if (!r.lastInsertRowid) {
+        console.error("❌ [BARCODE] lastInsertRowid es null, buscando por barcode...");
+        const result = get("SELECT * FROM ProductoBarcode WHERE barcode = ?", [barcode]);
+        if (!result) {
+          throw new Error("No se pudo recuperar el código de barras creado");
+        }
+        return result;
+      }
+
+      const result = get("SELECT * FROM ProductoBarcode WHERE id = ?", [r.lastInsertRowid]);
+      if (!result) {
+        throw new Error("No se pudo recuperar el código de barras creado");
+      }
+      return result;
     }
   });
 

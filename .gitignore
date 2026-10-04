@@ -7,3 +7,6 @@ dist-installer
 *.db
 *.sqlite
 *.sqlite3
+
+# Configuración local de Claude Code (puede tener tokens)
+.claude/settings.local.json

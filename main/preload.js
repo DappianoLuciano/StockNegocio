@@ -42,6 +42,17 @@ contextBridge.exposeInMainWorld("api", {
   deleteLote:       (payload) => ipcRenderer.invoke("lote:delete",         payload),
   listLotes:        ()        => ipcRenderer.invoke("lote:list"),
 
+  // ── Sincronización con la web ──
+  getSyncStatus:    ()        => ipcRenderer.invoke("sync:getStatus"),
+  syncNow:          ()        => ipcRenderer.invoke("sync:now"),
+  resync:           ()        => ipcRenderer.invoke("sync:resync"),
+  linkSync:         (payload) => ipcRenderer.invoke("sync:link",       payload),
+  onSyncStatus:     (cb) => {
+    const listener = (_e, status) => cb(status);
+    ipcRenderer.on("sync:status", listener);
+    return () => ipcRenderer.removeListener("sync:status", listener);
+  },
+
   // ── Ventas ──
   listVentas:       ()        => ipcRenderer.invoke("ventas:list"),
   createVenta:      (payload) => ipcRenderer.invoke("ventas:create",       payload),

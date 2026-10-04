@@ -2,6 +2,7 @@ import { useState } from "react";
 import StockPage from "./pages/StockPage";
 import VentasPage from "./pages/VentasPage";
 import InstructivoPage from "./pages/InstructivoPage";
+import SyncStatus from "./components/SyncStatus";
 
 const TEMPORADAS = [
   { id: "invierno26", label: "Agregar Invierno '26" },
@@ -68,6 +69,7 @@ export default function App() {
         </nav>
 
         <div className="sidebarFooter">
+          <SyncStatus />
           <div className="hintSmall">
             KAIA Stock<br />
             <strong>v1.0.3</strong>

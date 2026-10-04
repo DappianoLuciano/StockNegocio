@@ -66,7 +66,19 @@ async function createWindow() {
   const { registerIpcHandlers } = require("./ipc");
 
   await initDb(dbPath);
-  registerIpcHandlers(dbDir);
+
+  // Sincronización con la web (sigue funcionando sin internet)
+  const { getDb, persist } = require("./db");
+  const { ensureSyncSchema, createSync } = require("./sync");
+  ensureSyncSchema(getDb(), persist);
+  const sync = createSync({
+    getDb,
+    persist,
+    userDataDir: app.getPath("userData"),
+    onStatus: (status) => win?.webContents.send("sync:status", status),
+  });
+
+  registerIpcHandlers(dbDir, sync);
 
   // 3) Crear ventana
   win = new BrowserWindow({
@@ -83,6 +95,7 @@ async function createWindow() {
 
   // Mostrar cuando esté listo para evitar pantalla blanca
   win.once("ready-to-show", () => win.show());
+  sync.start();
 
   // Capturar errores del renderer
   win.webContents.on("did-fail-load", (_e, code, desc, url) => {
@@ -90,7 +103,7 @@ async function createWindow() {
   });
 
   if (!app.isPackaged) {
-    win.loadURL("http://localhost:5173");
+    win.loadURL(process.env.VITE_DEV_URL || "http://localhost:5173");
     // win.webContents.openDevTools({ mode: "detach" }); // Deshabilitado
   } else {
     const indexPath = path.join(__dirname, "..", "renderer", "dist", "index.html");
