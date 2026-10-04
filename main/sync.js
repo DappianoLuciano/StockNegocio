@@ -250,7 +250,10 @@ function createSync({ getDb, persist, userDataDir, onStatus }) {
       signal: AbortSignal.timeout(60000),
     });
     if (res.status === 401) throw Object.assign(new Error("Clave de sincronización inválida"), { auth: true });
-    if (!res.ok) throw new Error(`La web respondió ${res.status}`);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || `La web respondió ${res.status}`);
+    }
     return res.json();
   }
 
@@ -280,11 +283,28 @@ function createSync({ getDb, persist, userDataDir, onStatus }) {
       ...ventas.map((data) => ({ tabla: "Venta", data })),
     ].map((o, i) => ({ seq: i, op: "baseline", ...o }));
 
+    // Antes de subir nada: ¿esta base es la misma que tiene la web? (una base
+    // de otra PC o de prueba pisaría productos ajenos)
+    const check = await api(cfg, "POST", "/api/sync/check", {
+      temporada,
+      productos: productos.filter((p) => !p.deletedAt).map((p) => ({ uuid: p.uuid, codigo: p.codigo ?? null })),
+    });
+    if (!check.ok) {
+      throw new Error(
+        `Esta base de datos no coincide con la de la web (${check.matched} de ${check.local} productos). ` +
+          "No se sincronizó nada. Vinculá el programa desde la PC del local."
+      );
+    }
+
     console.log(`🔄 [SYNC] Baseline: ${ops.length} registros`);
     let failed = 0;
     for (let i = 0; i < ops.length; i += BASELINE_BATCH) {
       emit({ estado: "sincronizando", mensaje: `Subiendo inventario (${Math.min(i + BASELINE_BATCH, ops.length)}/${ops.length})` });
-      const { results } = await api(cfg, "POST", "/api/sync/push", { temporada, ops: ops.slice(i, i + BASELINE_BATCH) });
+      const { results } = await api(cfg, "POST", "/api/sync/push", {
+        temporada,
+        baselineChecked: true,
+        ops: ops.slice(i, i + BASELINE_BATCH),
+      });
       for (const r of results.filter((x) => !x.ok)) {
         const op = ops[r.seq];
         exec(db, "INSERT INTO SyncLog (tabla, op, data, error) VALUES (?, ?, ?, ?)", [op.tabla, op.op, JSON.stringify(op.data), r.error]);

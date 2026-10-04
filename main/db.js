@@ -11,7 +11,41 @@ function getDb() {
   return db;
 }
 
+function hasColumn(database, tabla, col) {
+  const r = database.exec(`PRAGMA table_info(${tabla})`);
+  return r.length > 0 && r[0].values.some((row) => row[1] === col);
+}
+
+function tableExists(database, tabla) {
+  const r = database.exec(`SELECT 1 FROM sqlite_master WHERE type='table' AND name='${tabla}'`);
+  return r.length > 0;
+}
+
+// Repara bases que quedaron a medias con la versión 1.2.0: la reconstrucción
+// de tablas falló al renombrar y los datos quedaron en Producto_new /
+// ProductoBarcode_new. Los triggers de sincronización se borran acá y
+// ensureSyncSchema los vuelve a crear después.
+function repairHalfRebuiltTables(database) {
+  const pendientes = ["Producto", "ProductoBarcode"].filter((t) => tableExists(database, `${t}_new`));
+  if (pendientes.length === 0) return;
+
+  const triggers = database.exec("SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'sync_%'");
+  for (const [name] of triggers[0]?.values ?? []) database.exec(`DROP TRIGGER IF EXISTS "${name}"`);
+
+  for (const t of pendientes) {
+    if (tableExists(database, t)) {
+      // Lo que haya en la tabla actual se suma a la copia y se descarta
+      try { database.exec(`INSERT OR IGNORE INTO ${t}_new SELECT * FROM ${t}`); } catch (_) {}
+      database.exec(`DROP TABLE ${t}`);
+    }
+    database.exec(`ALTER TABLE ${t}_new RENAME TO ${t}`);
+    console.log(`🛠️ [DB] Tabla ${t} reparada (recuperada de ${t}_new)`);
+  }
+}
+
 function runMigrations(database) {
+  repairHalfRebuiltTables(database);
+
   database.run(`
     CREATE TABLE IF NOT EXISTS Marca (
       id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -168,7 +202,10 @@ function runMigrations(database) {
     const tableInfo = database.exec("SELECT sql FROM sqlite_master WHERE type='table' AND name='Producto'");
     const needsMigration = tableInfo.length > 0 && tableInfo[0].values[0][0].includes('UNIQUE');
 
-    if (needsMigration || true) { // Siempre intentar por si acaso
+    // Solo bases viejas. Nunca reconstruir una base que ya sincroniza con
+    // la web: se perderían las columnas uuid/temporada y los triggers de
+    // sincronización impedirían renombrar la tabla.
+    if (needsMigration && !hasColumn(database, "Producto", "uuid")) {
       // Crear tabla temporal sin UNIQUE en barcode
       database.run(`
         CREATE TABLE IF NOT EXISTS Producto_new (
@@ -211,6 +248,11 @@ function runMigrations(database) {
   try {
     console.log("🔄 [DB] Verificando estructura de ProductoBarcode...");
 
+    const pbInfo = database.exec("SELECT sql FROM sqlite_master WHERE type='table' AND name='ProductoBarcode'");
+    const pbSql = pbInfo.length > 0 ? pbInfo[0].values[0][0] : "";
+    // Solo si a la tabla le falta el UNIQUE en barcode, y nunca en una base
+    // que ya sincroniza con la web (ver migración de Producto)
+    if (!/barcode\s+TEXT\s+NOT NULL\s+UNIQUE/i.test(pbSql) && !hasColumn(database, "ProductoBarcode", "uuid")) {
     // Recrear tabla con barcode UNIQUE
     database.run(`
       CREATE TABLE IF NOT EXISTS ProductoBarcode_new (
@@ -240,6 +282,7 @@ function runMigrations(database) {
     database.run("ALTER TABLE ProductoBarcode_new RENAME TO ProductoBarcode");
 
     console.log("✅ [DB] Migración de ProductoBarcode completada (barcode UNIQUE)");
+    }
   } catch (err) {
     console.error("❌ [DB] Error en migración de ProductoBarcode:", err);
   }
