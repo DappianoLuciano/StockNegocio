@@ -72,7 +72,7 @@ export default function App() {
           <SyncStatus />
           <div className="hintSmall">
             KAIA Stock<br />
-            <strong>v1.2.1</strong>
+            <strong>v1.2.2</strong>
           </div>
         </div>
       </aside>

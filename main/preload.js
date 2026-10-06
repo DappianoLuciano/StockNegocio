@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld("api", {
   syncNow:          ()        => ipcRenderer.invoke("sync:now"),
   resync:           ()        => ipcRenderer.invoke("sync:resync"),
   linkSync:         (payload) => ipcRenderer.invoke("sync:link",       payload),
+  unlinkSync:       ()        => ipcRenderer.invoke("sync:unlink"),
   onSyncStatus:     (cb) => {
     const listener = (_e, status) => cb(status);
     ipcRenderer.on("sync:status", listener);

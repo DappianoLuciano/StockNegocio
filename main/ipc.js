@@ -103,6 +103,10 @@ function registerIpcHandlers(dir, sync) {
     await sync?.link({ email: String(email).trim(), password: String(password) });
     return sync?.getStatus() ?? null;
   });
+  ipcMain.handle("sync:unlink", async () => {
+    sync?.unlink();
+    return sync?.getStatus() ?? null;
+  });
 
   // ── TEMPORADAS ─────────────────────────────────────────────────
   // Ya no se cambia de DB, solo se usa una única base de datos
@@ -361,7 +365,8 @@ function registerIpcHandlers(dir, sync) {
   ipcMain.handle("lote:getAbierto", async () => {
     try {
       console.log("🔍 [LOTE:GET_ABIERTO] Buscando lote abierto...");
-      const lote = get("SELECT * FROM Lote WHERE estado = 'abierto' ORDER BY createdAt DESC LIMIT 1");
+      // Solo los lotes de esta PC (los de otra PC llegan cuando se cierran)
+      const lote = get("SELECT * FROM Lote WHERE estado = 'abierto' AND origen = 'local' ORDER BY createdAt DESC LIMIT 1");
       console.log("🔍 [LOTE:GET_ABIERTO] Resultado:", lote ? `ID ${lote.id}` : "No hay lote abierto");
 
       if (!lote) return null;
@@ -1005,6 +1010,11 @@ function registerIpcHandlers(dir, sync) {
         nextNum = numericBarcodes[0] + 1;
       }
 
+      // Cada PC vinculada genera códigos de su propia serie (último dígito
+      // = serie), así dos PCs nunca generan el mismo número
+      const slot = sync?.getSlot?.() ?? 0;
+      while (nextNum % 10 !== slot) nextNum++;
+
       // Asegurar que el código generado no existe (por seguridad)
       let attempts = 0;
       while (attempts < 1000) {
@@ -1015,7 +1025,7 @@ function registerIpcHandlers(dir, sync) {
           console.log(`🔢 [BARCODE] Código generado: ${barcode}`);
           break;
         }
-        nextNum++;
+        nextNum += 10;
         attempts++;
       }
 

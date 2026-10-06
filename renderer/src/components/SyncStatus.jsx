@@ -108,13 +108,28 @@ export default function SyncStatus() {
       )}
 
       {(status.estado === "ok" || status.estado === "sin-conexion" || status.estado === "error") && (
-        <button
-          type="button"
-          onClick={() => window.api.syncNow().then(setStatus)}
-          style={{ marginTop: 4, background: "none", border: "none", padding: 0, color: "#2563eb", cursor: "pointer", fontSize: 12 }}
-        >
-          Sincronizar ahora
-        </button>
+        <div style={{ display: "flex", gap: 12, marginTop: 4 }}>
+          <button
+            type="button"
+            onClick={() => window.api.syncNow().then(setStatus)}
+            style={{ background: "none", border: "none", padding: 0, color: "#2563eb", cursor: "pointer", fontSize: 12 }}
+          >
+            Sincronizar ahora
+          </button>
+          {status.vinculado && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("¿Dejar de sincronizar esta PC con la web? Los datos de esta PC no se borran.")) {
+                  window.api.unlinkSync().then(setStatus);
+                }
+              }}
+              style={{ background: "none", border: "none", padding: 0, color: "#64748b", cursor: "pointer", fontSize: 12 }}
+            >
+              Desvincular
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

@@ -1,18 +1,22 @@
-// Sincronización del programa con la base central (web KAIA).
+// Sincronización del programa con la base central (web KAIA). Funciona con
+// una o varias PCs del local a la vez.
 //
 // El programa sigue trabajando sobre su SQLite local, con o sin internet.
 // Triggers de SQLite anotan cada cambio en SyncOutbox; cada pocos segundos,
-// si hay conexión, se manda la cola a la web (push) y se traen las
-// novedades de la web (pull): stock vendido online, lotes web y lotes web
-// anulados.
+// si hay conexión, se manda la cola a la web (push) y se baja todo lo que
+// cambió en la nube (pull): productos y códigos de las otras PCs, stock,
+// ventas de las otras PCs y de la web, y bajas.
 //
-// - El stock viaja como movimientos (+/-), así una venta del local y una
-//   de la web nunca se pisan.
+// - El stock viaja como movimientos (+/-), así las ventas de distintas PCs
+//   y de la web nunca se pisan.
 // - Los registros se identifican con un uuid. Los que ya existían se
 //   calculan igual que en la importación inicial (UUID v5 de
 //   "<temporada>:<tabla>:<id>"), así coinciden con los de la nube.
+// - Primera vez de cada PC: "fusión". La web suma solo lo que cambió esta
+//   PC desde la importación, y después se baja el estado completo.
 const crypto = require("crypto");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
 // Mismo namespace que scripts/import-stock-db.ts de la web. No cambiar.
@@ -21,7 +25,7 @@ const DEFAULT_URL = "https://kaia-ecommerce.vercel.app";
 const DEFAULT_TEMPORADA = "invierno26";
 const INTERVAL_MS = 15000;
 const PUSH_BATCH = 100;
-const BASELINE_BATCH = 150;
+const MERGE_BATCH = 150;
 
 function uuidv5(name, namespace = KAIA_NAMESPACE) {
   const ns = Buffer.from(namespace.replace(/-/g, ""), "hex");
@@ -40,15 +44,15 @@ const SQL_UUID = `(lower(hex(randomblob(4))) || '-' || lower(hex(randomblob(2)))
 const NOT_APPLYING = `(SELECT v FROM SyncState WHERE k = 'applying') IS NOT '1'`;
 
 // Columnas que viajan a la nube por tabla. Las referencias a otras tablas
-// se mandan como uuid.
+// se mandan como uuid. Los lotes web no viajan (se manejan en el panel).
 const TABLES = {
   Marca: { cols: ["nombre", "createdAt"] },
   TipoPrenda: { cols: ["nombre", "curva", "createdAt"] },
   Producto: {
-    cols: ["marca", "tipo", "codigo", "costo", "precioFinal", "talles", "colores", "temporada", "createdAt", "deletedAt"],
+    cols: ["marca", "tipo", "codigo", "costo", "precioFinal", "talles", "colores", "temporada", "createdAt", "updatedAt", "deletedAt"],
   },
   ProductoBarcode: {
-    cols: ["barcode", "talle", "color", "cantidad", "createdAt"],
+    cols: ["barcode", "talle", "color", "cantidad", "createdAt", "updatedAt"],
     refs: { productoUuid: ["Producto", "productoId"] },
   },
   Lote: {
@@ -178,6 +182,7 @@ function ensureSyncSchema(db, persist, temporada = DEFAULT_TEMPORADA) {
 
   for (const tabla of Object.keys(TABLES)) addColumn(db, tabla, "uuid TEXT");
   addColumn(db, "Producto", "temporada TEXT");
+  // local = creado en esta PC · otra-pc = bajado de otra PC · web = pedido web
   addColumn(db, "Lote", "origen TEXT NOT NULL DEFAULT 'local'");
 
   if (getState(db, "temporada") === null) setState(db, "temporada", temporada);
@@ -196,6 +201,8 @@ function ensureSyncSchema(db, persist, temporada = DEFAULT_TEMPORADA) {
   }
   for (const tabla of Object.keys(TABLES)) {
     db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_${tabla.toLowerCase()}_uuid ON ${tabla}(uuid)`);
+    // Se recrean siempre, por si cambió su definición entre versiones
+    for (const kind of ["ins", "mov", "upd", "del"]) db.exec(`DROP TRIGGER IF EXISTS sync_${tabla.toLowerCase()}_${kind}`);
     for (const sql of triggerSql(tabla)) db.exec(sql);
   }
   if (filled) console.log(`🔄 [SYNC] uuid asignados a ${filled} registros existentes`);
@@ -210,7 +217,7 @@ function loadConfig(userDataDir) {
   try {
     cfg = JSON.parse(fs.readFileSync(file, "utf8"));
   } catch (_) {
-    /* sin configurar */
+    /* sin vincular */
   }
   return {
     url: (process.env.KAIA_SYNC_URL || cfg.url || DEFAULT_URL).replace(/\/$/, ""),
@@ -231,6 +238,7 @@ function createSync({ getDb, persist, userDataDir, onStatus }) {
     status = {
       ...status,
       ...changes,
+      vinculado: !!loadConfig(userDataDir).token,
       pendientes: queryAll(db, "SELECT COUNT(*) AS n FROM SyncOutbox")[0].n,
       stockNegativo: queryAll(db, "SELECT COUNT(*) AS n FROM ProductoBarcode WHERE cantidad < 0")[0].n,
       errores: queryAll(db, "SELECT COUNT(*) AS n FROM SyncLog")[0].n,
@@ -242,17 +250,36 @@ function createSync({ getDb, persist, userDataDir, onStatus }) {
     }
   }
 
+  // Id de esta PC: vive en la base (si se cambia de base, es otra PC)
+  function deviceId() {
+    const db = getDb();
+    let id = getState(db, "deviceId");
+    if (!id) {
+      id = crypto.randomUUID();
+      setState(db, "deviceId", id);
+      persist();
+    }
+    return id;
+  }
+
   async function api(cfg, method, route, body) {
     const res = await fetch(`${cfg.url}${route}`, {
       method,
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.token}` },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${cfg.token}`,
+        "x-kaia-device": deviceId(),
+      },
       body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(60000),
     });
-    if (res.status === 401) throw Object.assign(new Error("Clave de sincronización inválida"), { auth: true });
+    if (res.status === 401) {
+      const b = await res.json().catch(() => ({}));
+      throw Object.assign(new Error(b.error || "Clave de sincronización inválida"), { auth: true });
+    }
     if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error || `La web respondió ${res.status}`);
+      const b = await res.json().catch(() => ({}));
+      throw new Error(b.error || `La web respondió ${res.status}`);
     }
     return res.json();
   }
@@ -266,25 +293,18 @@ function createSync({ getDb, persist, userDataDir, onStatus }) {
     return queryAll(db, `SELECT ${cols} FROM ${tabla} x ${where}`);
   }
 
-  // Primera sincronización: se manda el estado completo (stock absoluto)
-  async function baseline(cfg, temporada) {
+  function logError(db, tabla, op, data, error) {
+    exec(db, "INSERT INTO SyncLog (tabla, op, data, error) VALUES (?, ?, ?, ?)", [tabla, op, typeof data === "string" ? data : JSON.stringify(data), error]);
+  }
+
+  // Primera vez de esta PC: fusión con la nube + bajada completa
+  async function join(cfg, temporada) {
     const db = getDb();
     const maxSeq = queryAll(db, "SELECT COALESCE(MAX(seq), 0) AS m FROM SyncOutbox")[0].m;
     const productos = snapshotRows(db, "Producto");
-    const barcodes = snapshotRows(db, "ProductoBarcode");
-    const lotes = snapshotRows(db, "Lote", "WHERE x.origen IS NOT 'web'");
-    const ventas = snapshotRows(db, "Venta", "WHERE (SELECT origen FROM Lote WHERE id = x.loteId) IS NOT 'web'");
-    const ops = [
-      ...snapshotRows(db, "Marca").map((data) => ({ tabla: "Marca", data })),
-      ...snapshotRows(db, "TipoPrenda").map((data) => ({ tabla: "TipoPrenda", data })),
-      ...productos.map((data) => ({ tabla: "Producto", data })),
-      ...barcodes.map((data) => ({ tabla: "ProductoBarcode", data })),
-      ...lotes.map((data) => ({ tabla: "Lote", data })),
-      ...ventas.map((data) => ({ tabla: "Venta", data })),
-    ].map((o, i) => ({ seq: i, op: "baseline", ...o }));
 
-    // Antes de subir nada: ¿esta base es la misma que tiene la web? (una base
-    // de otra PC o de prueba pisaría productos ajenos)
+    // ¿Esta base sale de la misma importación que la nube? Una base
+    // distinta (de prueba, de otro lado) pisaría productos ajenos.
     const check = await api(cfg, "POST", "/api/sync/check", {
       temporada,
       productos: productos.filter((p) => !p.deletedAt).map((p) => ({ uuid: p.uuid, codigo: p.codigo ?? null })),
@@ -292,37 +312,38 @@ function createSync({ getDb, persist, userDataDir, onStatus }) {
     if (!check.ok) {
       throw new Error(
         `Esta base de datos no coincide con la de la web (${check.matched} de ${check.local} productos). ` +
-          "No se sincronizó nada. Vinculá el programa desde la PC del local."
+          "No se sincronizó nada."
       );
     }
 
-    console.log(`🔄 [SYNC] Baseline: ${ops.length} registros`);
-    let failed = 0;
-    for (let i = 0; i < ops.length; i += BASELINE_BATCH) {
-      emit({ estado: "sincronizando", mensaje: `Subiendo inventario (${Math.min(i + BASELINE_BATCH, ops.length)}/${ops.length})` });
-      const { results } = await api(cfg, "POST", "/api/sync/push", {
-        temporada,
-        baselineChecked: true,
-        ops: ops.slice(i, i + BASELINE_BATCH),
-      });
-      for (const r of results.filter((x) => !x.ok)) {
-        const op = ops[r.seq];
-        exec(db, "INSERT INTO SyncLog (tabla, op, data, error) VALUES (?, ?, ?, ?)", [op.tabla, op.op, JSON.stringify(op.data), r.error]);
-        failed++;
-      }
+    const ops = [
+      ...snapshotRows(db, "Marca").map((data) => ({ tabla: "Marca", data })),
+      ...snapshotRows(db, "TipoPrenda").map((data) => ({ tabla: "TipoPrenda", data })),
+      ...productos.map((data) => ({ tabla: "Producto", data })),
+      ...snapshotRows(db, "ProductoBarcode").map((data) => ({ tabla: "ProductoBarcode", data })),
+      ...snapshotRows(db, "Lote", "WHERE x.origen = 'local'").map((data) => ({ tabla: "Lote", data })),
+      ...snapshotRows(db, "Venta", "WHERE (SELECT origen FROM Lote WHERE id = x.loteId) = 'local'").map((data) => ({
+        tabla: "Venta",
+        data,
+      })),
+    ].map((o, i) => ({ seq: i, op: "merge", ...o }));
+
+    console.log(`🔄 [SYNC] Fusión: ${ops.length} registros`);
+    for (let i = 0; i < ops.length; i += MERGE_BATCH) {
+      emit({ estado: "sincronizando", mensaje: `Uniendo con la web (${Math.min(i + MERGE_BATCH, ops.length)}/${ops.length})` });
+      const { results } = await api(cfg, "POST", "/api/sync/push", { temporada, ops: ops.slice(i, i + MERGE_BATCH) });
+      for (const r of results.filter((x) => !x.ok)) logError(db, ops[r.seq].tabla, "merge", ops[r.seq].data, r.error);
     }
-    await api(cfg, "POST", "/api/sync/baseline", {
-      temporada,
-      productos: productos.map((p) => p.uuid),
-      barcodes: barcodes.map((b) => b.uuid),
-      lotes: lotes.map((l) => l.uuid),
-      ventas: ventas.map((v) => v.uuid),
-    });
-    // Lo encolado antes del snapshot ya está incluido en el estado mandado
+    // Lo encolado antes de la fusión ya está incluido en lo que se mandó
     exec(db, "DELETE FROM SyncOutbox WHERE seq <= ?", [maxSeq]);
-    setState(db, "baselineDone", new Date().toISOString());
+    setState(db, "lastPull", null);
     persist();
-    console.log(`🔄 [SYNC] Baseline completo (${failed} con error)`);
+
+    emit({ estado: "sincronizando", mensaje: "Bajando datos de la web..." });
+    await pull(cfg);
+    setState(db, "joinedAt", new Date().toISOString());
+    persist();
+    console.log("🔄 [SYNC] Fusión completa");
   }
 
   async function push(cfg, temporada) {
@@ -335,7 +356,7 @@ function createSync({ getDb, persist, userDataDir, onStatus }) {
       for (const r of results) {
         if (!r.ok) {
           const row = rows.find((x) => x.seq === r.seq);
-          exec(db, "INSERT INTO SyncLog (tabla, op, data, error) VALUES (?, ?, ?, ?)", [row.tabla, row.op, row.data, r.error]);
+          logError(db, row.tabla, row.op, row.data, r.error);
         }
         exec(db, "DELETE FROM SyncOutbox WHERE seq = ?", [r.seq]);
       }
@@ -349,28 +370,57 @@ function createSync({ getDb, persist, userDataDir, onStatus }) {
     return r ? r.id : null;
   }
 
+  // Aplica lo que cambió en la nube. Corre con 'applying' = 1 para que los
+  // triggers no vuelvan a encolarlo.
   async function pull(cfg) {
     const db = getDb();
     const since = getState(db, "lastPull");
     const data = await api(cfg, "GET", `/api/sync/pull${since ? `?since=${encodeURIComponent(since)}` : ""}`);
 
-    // Códigos con cambios locales todavía sin mandar: no pisarlos
-    const pending = new Set(
-      queryAll(
-        db,
-        `SELECT json_extract(data, '$.barcodeUuid') AS u FROM SyncOutbox WHERE tabla = 'Movimiento'
-         UNION SELECT json_extract(data, '$.uuid') FROM SyncOutbox WHERE tabla = 'ProductoBarcode'`
-      ).map((r) => r.u)
-    );
-
     setState(db, "applying", "1");
     let cambios = 0;
     try {
+      for (const m of data.marcas) {
+        exec(db, "INSERT OR IGNORE INTO Marca (nombre, uuid, createdAt) VALUES (?, ?, datetime('now'))", [m.nombre, uuidv5(`marca:${m.nombre}`)]);
+      }
+      for (const t of data.tipos) {
+        exec(db, "INSERT OR IGNORE INTO TipoPrenda (nombre, curva, uuid, createdAt) VALUES (?, ?, ?, datetime('now'))", [t.nombre, t.curva, uuidv5(`tipo:${t.nombre}`)]);
+        exec(db, "UPDATE TipoPrenda SET curva = ? WHERE nombre = ?", [t.curva, t.nombre]);
+      }
+
+      for (const p of data.productos) {
+        const vals = [p.marca, p.tipo, p.codigo, p.costo, p.precioFinal, p.talles, p.colores, p.temporada, p.deletedAt];
+        if (localId(db, "Producto", p.uuid)) {
+          exec(db, `UPDATE Producto SET marca=?, tipo=?, codigo=?, costo=?, precioFinal=?, talles=?, colores=?, temporada=?,
+                    deletedAt=?, updatedAt=datetime('now') WHERE uuid=?`, [...vals, p.uuid]);
+        } else {
+          exec(db, `INSERT INTO Producto (marca, tipo, codigo, costo, precioFinal, talles, colores, temporada, deletedAt, uuid, createdAt, updatedAt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`, [...vals, p.uuid, p.createdAt]);
+        }
+        cambios++;
+      }
+
       for (const b of data.barcodes) {
-        if (pending.has(b.id)) continue;
-        const row = queryAll(db, "SELECT cantidad FROM ProductoBarcode WHERE uuid = ?", [b.id])[0];
-        if (row && row.cantidad !== b.cantidad) {
-          exec(db, "UPDATE ProductoBarcode SET cantidad = ?, updatedAt = datetime('now') WHERE uuid = ?", [b.cantidad, b.id]);
+        const productoId = localId(db, "Producto", b.productoUuid);
+        if (!productoId) {
+          logError(db, "ProductoBarcode", "pull", b, "Producto inexistente en esta PC");
+          continue;
+        }
+        const clash = queryAll(db, "SELECT uuid FROM ProductoBarcode WHERE barcode = ? AND uuid IS NOT ?", [b.barcode, b.uuid])[0];
+        if (clash) {
+          logError(db, "ProductoBarcode", "pull", b, `El código ${b.barcode} ya existe en esta PC en otro producto`);
+          continue;
+        }
+        const row = queryAll(db, "SELECT productoId, barcode, talle, color, cantidad FROM ProductoBarcode WHERE uuid = ?", [b.uuid])[0];
+        if (row) {
+          if (row.productoId !== productoId || row.barcode !== b.barcode || row.talle !== b.talle || row.color !== b.color || row.cantidad !== b.cantidad) {
+            exec(db, `UPDATE ProductoBarcode SET productoId=?, barcode=?, talle=?, color=?, cantidad=?, updatedAt=datetime('now') WHERE uuid=?`,
+              [productoId, b.barcode, b.talle, b.color, b.cantidad, b.uuid]);
+            cambios++;
+          }
+        } else {
+          exec(db, `INSERT INTO ProductoBarcode (productoId, barcode, talle, color, cantidad, uuid, createdAt, updatedAt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`, [productoId, b.barcode, b.talle, b.color, b.cantidad, b.uuid, b.createdAt]);
           cambios++;
         }
       }
@@ -384,8 +434,8 @@ function createSync({ getDb, persist, userDataDir, onStatus }) {
           exec(db, "DELETE FROM Venta WHERE loteId = ?", [loteId]);
         } else {
           exec(db, `INSERT INTO Lote (uuid, origen, fecha, cliente, metodoPago, total, estado, createdAt, closedAt)
-                    VALUES (?, 'web', ?, ?, ?, ?, ?, ?, ?)`, [
-            l.uuid, l.fecha, l.cliente, l.metodoPago, l.total, l.estado, l.createdAt, l.closedAt,
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+            l.uuid, l.origen === "web" ? "web" : "otra-pc", l.fecha, l.cliente, l.metodoPago, l.total, l.estado, l.createdAt, l.closedAt,
           ]);
           loteId = queryAll(db, "SELECT last_insert_rowid() AS id")[0].id;
         }
@@ -400,12 +450,17 @@ function createSync({ getDb, persist, userDataDir, onStatus }) {
       }
 
       for (const t of data.tombstones) {
-        if (t.tabla !== "lote") continue;
-        const loteId = queryAll(db, "SELECT id FROM Lote WHERE uuid = ? AND origen = 'web'", [t.registroId])[0]?.id;
-        if (loteId) {
-          exec(db, "DELETE FROM Venta WHERE loteId = ?", [loteId]);
-          exec(db, "DELETE FROM Lote WHERE id = ?", [loteId]);
-          cambios++;
+        if (t.tabla === "lote") {
+          const loteId = localId(db, "Lote", t.registroId);
+          if (loteId) {
+            exec(db, "DELETE FROM Venta WHERE loteId = ?", [loteId]);
+            exec(db, "DELETE FROM Lote WHERE id = ?", [loteId]);
+            cambios++;
+          }
+        } else if (t.tabla === "venta") {
+          exec(db, "DELETE FROM Venta WHERE uuid = ?", [t.registroId]);
+        } else if (t.tabla === "barcode") {
+          exec(db, "DELETE FROM ProductoBarcode WHERE uuid = ?", [t.registroId]);
         }
       }
       setState(db, "lastPull", data.now);
@@ -428,14 +483,17 @@ function createSync({ getDb, persist, userDataDir, onStatus }) {
       const db = getDb();
       const temporada = getState(db, "temporada") || DEFAULT_TEMPORADA;
       emit({ estado: "sincronizando", mensaje: null });
-      if (!getState(db, "baselineDone")) await baseline(cfg, temporada);
+      if (!getState(db, "joinedAt")) await join(cfg, temporada);
       await push(cfg, temporada);
-      const cambios = await pull(cfg);
+      // Solo se baja con la cola vacía: así nunca se pisa un cambio local
+      // que todavía no llegó a la web
+      let cambios = 0;
+      if (queryAll(db, "SELECT COUNT(*) AS n FROM SyncOutbox")[0].n === 0) cambios = await pull(cfg);
       emit({ estado: "ok", ultimaSync: new Date().toISOString(), mensaje: null, cambiosWeb: cambios });
     } catch (err) {
       const offline = !err.auth && (err.name === "TimeoutError" || err.cause || /fetch failed/i.test(err.message));
       emit({ estado: offline ? "sin-conexion" : "error", mensaje: offline ? "Sin conexión con la web" : err.message });
-      if (!offline) console.error("❌ [SYNC]", err);
+      if (!offline) console.error("❌ [SYNC]", err.message);
     } finally {
       busy = false;
     }
@@ -453,15 +511,16 @@ function createSync({ getDb, persist, userDataDir, onStatus }) {
     },
     syncNow: tick,
     getStatus: () => status,
-    // Volver a mandar todo el inventario (si algo quedó desfasado)
+    // Serie de esta PC para los códigos de barras automáticos (0-9)
+    getSlot: () => Number(getState(getDb(), "slot") ?? 0),
+    // Volver a bajar todo de la web (si algo quedó desfasado)
     async resync() {
-      setState(getDb(), "baselineDone", null);
+      setState(getDb(), "lastPull", null);
       persist();
       await tick();
     },
     saveConfig({ url, token }) {
-      const cfg = loadConfig(userDataDir);
-      fs.writeFileSync(cfg.file, JSON.stringify({ url: url || DEFAULT_URL, token }, null, 2), "utf8");
+      fs.writeFileSync(loadConfig(userDataDir).file, JSON.stringify({ url: url || DEFAULT_URL, token }, null, 2), "utf8");
     },
     // Vincular con el usuario y contraseña del panel de la web
     async link({ email, password }) {
@@ -471,7 +530,7 @@ function createSync({ getDb, persist, userDataDir, onStatus }) {
         res = await fetch(`${cfg.url}/api/sync/link`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email, password, deviceId: deviceId(), nombre: os.hostname() }),
           signal: AbortSignal.timeout(30000),
         });
       } catch (_) {
@@ -479,8 +538,20 @@ function createSync({ getDb, persist, userDataDir, onStatus }) {
       }
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.token) throw new Error(data.error || "No se pudo vincular");
+      setState(getDb(), "slot", data.slot ?? 0);
+      persist();
       this.saveConfig({ url: cfg.url === DEFAULT_URL ? undefined : cfg.url, token: data.token });
       await tick();
+    },
+    // Dejar de sincronizar esta PC. La base recuerda que ya se fusionó, así
+    // que volver a vincularla no suma nada dos veces.
+    unlink() {
+      try {
+        fs.unlinkSync(loadConfig(userDataDir).file);
+      } catch (_) {
+        /* ya no estaba */
+      }
+      emit({ estado: "sin-configurar", mensaje: "Falta vincular el programa con la web" });
     },
   };
 }
